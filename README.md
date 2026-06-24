@@ -6,16 +6,17 @@ Every team drowns in incident tickets. Manual review is too slow to catch emergi
 
 ## Status
 
-**M1 — Scaffold (current)**
+**M2 — Synthetic dataset + ingestion pipeline (current)**
 
-- Python package layout initialized (`app/`, `demo/`, `tests/`)
-- FastAPI application skeleton boots; `GET /healthz` returns `{"status": "ok"}`
-- Smoke tests pass: `make test`
-- All runtime and dev dependencies pinned in `requirements.txt`
-- `Makefile` targets: `install`, `run`, `test`, `demo` (demo requires M2)
-- MIT license and `.gitignore` in place
+- `demo/generate_dataset.py` produces 500 reproducible fictional incident tickets across 8 hidden risk themes (auth failures, payment errors, latency spikes, data pipeline, disk pressure, deployment issues, network flap, security alerts)
+- `app/models.py` — `Incident` Pydantic v2 model with validated severity enum
+- `app/ingestion.py` — `load_incidents(source)` reads CSV or JSONL (or stdin via `"-"`), skips and warns on bad rows
+- All tests pass: `pytest tests/ -v`
+- `make demo` generates `demo/incidents.csv`
 
-Pipeline code (embedder, clusterer, risk scorer, LLM summarizer, dashboard) ships in M2–M5.
+M1 (scaffold): Python package layout, FastAPI skeleton, `GET /healthz`, pinned deps.
+
+Embedder, clusterer, risk scorer, LLM summarizer, and dashboard ship in M3–M5.
 
 ## Planned Architecture
 
@@ -69,11 +70,10 @@ To run the smoke tests:
 make test
 ```
 
-To run the demo with synthetic data (requires M2):
+To generate the synthetic dataset:
 
 ```bash
-make demo   # generates demo/incidents.csv — demo/generate_dataset.py ships in M2
-# Then POST it via the dashboard or curl
+make demo   # writes demo/incidents.csv (500 rows, 8 risk themes)
 ```
 
 ## Project Layout
@@ -82,14 +82,17 @@ make demo   # generates demo/incidents.csv — demo/generate_dataset.py ships in
 incidentlens/
 ├── app/
 │   ├── __init__.py
-│   └── main.py          # FastAPI app entry point
+│   ├── main.py          # FastAPI app entry point
+│   ├── models.py        # Incident Pydantic v2 model  (M2)
+│   └── ingestion.py     # load_incidents(CSV/JSONL)   (M2)
 ├── demo/
 │   ├── __init__.py
 │   ├── .gitkeep
-│   └── generate_dataset.py   # generates 500 synthetic incidents (M2)
+│   └── generate_dataset.py   # 500 synthetic incidents (M2)
 ├── tests/
 │   ├── __init__.py
-│   └── test_smoke.py    # import + healthz smoke test
+│   ├── test_smoke.py         # healthz smoke test
+│   └── test_ingestion.py     # generator + ingestion tests (M2)
 ├── requirements.txt     # pinned runtime + dev deps
 ├── Makefile             # install / run / demo / test
 ├── LICENSE              # MIT
@@ -112,7 +115,7 @@ incidentlens/
 | Milestone | Scope | Status |
 |---|---|---|
 | M1 | Scaffold: package layout, FastAPI skeleton, Makefile, pinned deps | done |
-| M2 | Data layer: synthetic dataset generator, CSV/JSONL ingest endpoint | <!-- TODO --> |
+| M2 | Data layer: synthetic dataset generator, CSV/JSONL ingest, Pydantic model | done |
 | M3 | Embedding + clustering: MiniLM embedder, HDBSCAN clusterer, in-memory store | <!-- TODO --> |
 | M4 | Risk scoring + LLM summarizer: recency-weighted scorer, OpenAI/Ollama summarizer | <!-- TODO --> |
 | M5 | Dashboard: Jinja2 risk-ranked cluster cards, `GET /clusters` endpoint | <!-- TODO --> |

@@ -6,17 +6,17 @@ Every team drowns in incident tickets. Manual review is too slow to catch emergi
 
 ## Status
 
-**M2 — Synthetic dataset + ingestion pipeline (current)**
+**M3 — Embedding + clustering engine (current)**
 
-- `demo/generate_dataset.py` produces 500 reproducible fictional incident tickets across 8 hidden risk themes (auth failures, payment errors, latency spikes, data pipeline, disk pressure, deployment issues, network flap, security alerts)
-- `app/models.py` — `Incident` Pydantic v2 model with validated severity enum
-- `app/ingestion.py` — `load_incidents(source)` reads CSV or JSONL (or stdin via `"-"`), skips and warns on bad rows
-- All tests pass: `pytest tests/ -v`
-- `make demo` generates `demo/incidents.csv`
+- `app/embedder.py` — `embed(incidents)` encodes incident text with `all-MiniLM-L6-v2` (CPU, ~80 MB); model is lazily loaded and cached
+- `app/clusterer.py` — `cluster(incidents, embeddings)` groups incidents with HDBSCAN (falls back to KMeans when hdbscan unavailable or >50% noise); returns `ClusterResult` list sorted by `risk_score = cluster_size × Σ exp(-age_days/7)`
+- `N_CLUSTERS` env var controls KMeans k (default 8)
+- All tests pass: `pytest tests/ -v -m "not slow"` (skip model-download tests in CI)
 
+M2 (data layer): synthetic dataset generator, CSV/JSONL ingest, Pydantic model.
 M1 (scaffold): Python package layout, FastAPI skeleton, `GET /healthz`, pinned deps.
 
-Embedder, clusterer, risk scorer, LLM summarizer, and dashboard ship in M3–M5.
+Risk scorer integration, LLM summarizer, and dashboard ship in M4–M5.
 
 ## Planned Architecture
 
@@ -84,7 +84,9 @@ incidentlens/
 │   ├── __init__.py
 │   ├── main.py          # FastAPI app entry point
 │   ├── models.py        # Incident Pydantic v2 model  (M2)
-│   └── ingestion.py     # load_incidents(CSV/JSONL)   (M2)
+│   ├── ingestion.py     # load_incidents(CSV/JSONL)   (M2)
+│   ├── embedder.py      # embed(incidents) → ndarray  (M3)
+│   └── clusterer.py     # cluster() → ClusterResult[] (M3)
 ├── demo/
 │   ├── __init__.py
 │   ├── .gitkeep
@@ -92,7 +94,8 @@ incidentlens/
 ├── tests/
 │   ├── __init__.py
 │   ├── test_smoke.py         # healthz smoke test
-│   └── test_ingestion.py     # generator + ingestion tests (M2)
+│   ├── test_ingestion.py     # generator + ingestion tests (M2)
+│   └── test_clustering.py    # embedder + clusterer tests  (M3)
 ├── requirements.txt     # pinned runtime + dev deps
 ├── Makefile             # install / run / demo / test
 ├── LICENSE              # MIT
@@ -116,8 +119,8 @@ incidentlens/
 |---|---|---|
 | M1 | Scaffold: package layout, FastAPI skeleton, Makefile, pinned deps | done |
 | M2 | Data layer: synthetic dataset generator, CSV/JSONL ingest, Pydantic model | done |
-| M3 | Embedding + clustering: MiniLM embedder, HDBSCAN clusterer, in-memory store | <!-- TODO --> |
-| M4 | Risk scoring + LLM summarizer: recency-weighted scorer, OpenAI/Ollama summarizer | <!-- TODO --> |
+| M3 | Embedding + clustering: MiniLM embedder, HDBSCAN clusterer, risk scoring | done |
+| M4 | LLM summarizer: OpenAI/Ollama cluster summarizer, `POST /ingest` + `GET /clusters` endpoints | <!-- TODO --> |
 | M5 | Dashboard: Jinja2 risk-ranked cluster cards, `GET /clusters` endpoint | <!-- TODO --> |
 
 ## License

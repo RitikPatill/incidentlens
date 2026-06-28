@@ -18,3 +18,13 @@ class Incident(BaseModel):
         if not v.strip():
             raise ValueError("id must not be empty")
         return v.strip()
+
+
+class ClusterSummary(BaseModel):
+    cluster_id: int
+    size: int
+    risk_score: float
+    top_severity: str
+    theme: str                    # ≤6 words
+    risk_description: str         # one sentence
+    top_incidents: list[str]      # 3 incident titles

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IncidentLens</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+    header {
+      background: #16213e;
+      color: #e2e8f0;
+      padding: 1rem 2rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    main { padding: 2rem; max-width: 960px; margin: 0 auto; }
+    .empty-msg {
+      text-align: center;
+      color: #6b7280;
+      margin-top: 4rem;
+      font-size: 1.1rem;
+    }
+    .grid { display: grid; gap: 1.25rem; }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      border-left: 4px solid #cbd5e1;
+    }
+    .card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+    .theme { font-size: 1.1rem; font-weight: 700; }
+    .badge {
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .badge-red    { background: #dc2626; }
+    .badge-orange { background: #ea580c; }
+    .badge-gold   { background: #b45309; }
+    .meta { font-size: 0.82rem; color: #6b7280; margin-bottom: 0.6rem; }
+    .risk-desc { font-size: 0.95rem; margin-bottom: 0.75rem; }
+    .incidents-title { font-size: 0.8rem; font-weight: 600; color: #374151; margin-bottom: 0.3rem; }
+    ul.incidents { list-style: disc; padding-left: 1.3rem; }
+    ul.incidents li { font-size: 0.85rem; color: #4b5563; line-height: 1.5; }
+    footer {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 0.8rem;
+      padding: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <header>IncidentLens &mdash; Risk Dashboard</header>
+  <main>
+    {% if not clusters %}
+      <p class="empty-msg">No incidents ingested yet. Use <code>POST /ingest</code> to get started.</p>
+    {% else %}
+      <div class="grid">
+        {% for cluster in clusters %}
+          {% set idx = loop.index %}
+          <div class="card">
+            <div class="card-header">
+              <span class="theme">{{ cluster.theme }}</span>
+              {% if idx <= 2 %}
+                <span class="badge badge-red">{{ "%.1f"|format(cluster.risk_score) }}</span>
+              {% elif idx <= 4 %}
+                <span class="badge badge-orange">{{ "%.1f"|format(cluster.risk_score) }}</span>
+              {% else %}
+                <span class="badge badge-gold">{{ "%.1f"|format(cluster.risk_score) }}</span>
+              {% endif %}
+            </div>
+            <p class="meta">{{ cluster.size }} incidents &middot; top severity: {{ cluster.top_severity }}</p>
+            <p class="risk-desc">{{ cluster.risk_description }}</p>
+            {% set has_incidents = cluster.top_incidents | selectattr("__len__") | list %}
+            {% if has_incidents %}
+              <p class="incidents-title">Sample incidents:</p>
+              <ul class="incidents">
+                {% for title in cluster.top_incidents %}
+                  {% if title %}
+                    <li>{{ title }}</li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </main>
+  <footer>Powered by IncidentLens &middot; {{ ingested_count }} incidents analysed</footer>
+</body>
+</html>

@@ -6,19 +6,18 @@ Every team drowns in incident tickets. Manual review is too slow to catch emergi
 
 ## Status
 
-**M4 — LLM summarizer (current)**
+**M5 — FastAPI backend + HTML dashboard (current)**
 
-- `app/summarizer.py` — `summarize_cluster(cluster, members, centroid)` calls `gpt-4o-mini` via the OpenAI chat completions API and returns a `ClusterSummary` with a theme (≤6 words), a one-sentence risk description, and the top 3 incident titles
-- Set `OPENAI_BASE_URL=http://localhost:11434/v1` (and `OPENAI_API_KEY=ollama`) to route requests through a local Ollama instance instead
-- Summaries are cached in-process, keyed by SHA-256 hash of the cluster centroid, so repeated calls for the same cluster avoid redundant API round-trips
-- `app/models.py` now exports `ClusterSummary` (Pydantic v2 model added in M4)
-- All tests pass: `pytest tests/ -v -m "not slow"` (OpenAI calls are mocked in `test_summarizer.py`)
+- `POST /ingest` — upload a CSV or JSONL file; runs the full pipeline (load → embed → cluster → summarize) and stores results in-memory
+- `GET /clusters` — returns risk-ranked `ClusterSummary` list as JSON
+- `GET /` — Jinja2 dashboard showing risk-ranked cluster cards with theme, score badge, risk description, and sample incidents
+- `GET /health` (and `/healthz` alias) — health check endpoint
+- `app/templates/dashboard.html` — plain HTML + inline CSS, no JS framework, no CDN
 
+M4 (LLM summarizer): `summarize_cluster()` via OpenAI/Ollama, centroid-keyed in-memory cache.
 M3 (embedding + clustering): MiniLM embedder, HDBSCAN clusterer, recency-weighted risk scorer.
 M2 (data layer): synthetic dataset generator, CSV/JSONL ingest, Pydantic model.
 M1 (scaffold): Python package layout, FastAPI skeleton, `GET /healthz`, pinned deps.
-
-Dashboard ships in M5.
 
 ## Architecture
 
@@ -66,6 +65,23 @@ make run
 # GET /docs     →  OpenAPI spec (endpoints added each milestone)
 ```
 
+To ingest data and view results:
+
+```bash
+make demo   # writes demo/incidents.csv (500 rows, 8 risk themes)
+
+# Upload and run the full pipeline
+curl -X POST http://localhost:8000/ingest \
+     -F "file=@demo/incidents.csv"
+# {"ingested": 500, "clusters": 8}
+
+# View risk-ranked clusters as JSON
+curl http://localhost:8000/clusters
+
+# Or open the HTML dashboard
+open http://localhost:8000
+```
+
 To run the smoke tests:
 
 ```bash
@@ -84,19 +100,21 @@ make demo   # writes demo/incidents.csv (500 rows, 8 risk themes)
 incidentlens/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py          # FastAPI app entry point
+│   ├── main.py          # FastAPI app — /ingest, /clusters, / dashboard (M5)
 │   ├── models.py        # Incident, ClusterSummary Pydantic v2 models (M2, M4)
 │   ├── ingestion.py     # load_incidents(CSV/JSONL)   (M2)
 │   ├── embedder.py      # embed(incidents) → ndarray  (M3)
 │   ├── clusterer.py     # cluster() → ClusterResult[] (M3)
-│   └── summarizer.py    # summarize_cluster() → ClusterSummary (M4)
+│   ├── summarizer.py    # summarize_cluster() → ClusterSummary (M4)
+│   └── templates/
+│       └── dashboard.html   # Jinja2 risk-ranked cluster cards (M5)
 ├── demo/
 │   ├── __init__.py
 │   ├── .gitkeep
 │   └── generate_dataset.py   # 500 synthetic incidents (M2)
 ├── tests/
 │   ├── __init__.py
-│   ├── test_smoke.py         # healthz smoke test
+│   ├── test_smoke.py         # M5 endpoint tests: /health, /clusters, /ingest, dashboard
 │   ├── test_ingestion.py     # generator + ingestion tests (M2)
 │   ├── test_clustering.py    # embedder + clusterer tests  (M3)
 │   └── test_summarizer.py    # summarizer tests, OpenAI mocked (M4)
@@ -125,7 +143,7 @@ incidentlens/
 | M2 | Data layer: synthetic dataset generator, CSV/JSONL ingest, Pydantic model | done |
 | M3 | Embedding + clustering: MiniLM embedder, HDBSCAN clusterer, risk scoring | done |
 | M4 | LLM summarizer: OpenAI/Ollama cluster summarizer, centroid-keyed cache, `ClusterSummary` model | done |
-| M5 | Dashboard: Jinja2 risk-ranked cluster cards, `GET /clusters` endpoint | <!-- TODO --> |
+| M5 | FastAPI backend: `POST /ingest`, `GET /clusters`, Jinja2 risk dashboard | done |
 
 ## License
 

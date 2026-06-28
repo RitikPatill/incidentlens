@@ -14,3 +14,5 @@ htmlcov/
 *.log
 
 demo/incidents.csv
+demo/demo.cast
+demo/demo.gif

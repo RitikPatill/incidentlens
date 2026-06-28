@@ -6,19 +6,21 @@ Every team drowns in incident tickets. Manual review is too slow to catch emergi
 
 ## Status
 
-**M3 — Embedding + clustering engine (current)**
+**M4 — LLM summarizer (current)**
 
-- `app/embedder.py` — `embed(incidents)` encodes incident text with `all-MiniLM-L6-v2` (CPU, ~80 MB); model is lazily loaded and cached
-- `app/clusterer.py` — `cluster(incidents, embeddings)` groups incidents with HDBSCAN (falls back to KMeans when hdbscan unavailable or >50% noise); returns `ClusterResult` list sorted by `risk_score = cluster_size × Σ exp(-age_days/7)`
-- `N_CLUSTERS` env var controls KMeans k (default 8)
-- All tests pass: `pytest tests/ -v -m "not slow"` (skip model-download tests in CI)
+- `app/summarizer.py` — `summarize_cluster(cluster, members, centroid)` calls `gpt-4o-mini` via the OpenAI chat completions API and returns a `ClusterSummary` with a theme (≤6 words), a one-sentence risk description, and the top 3 incident titles
+- Set `OPENAI_BASE_URL=http://localhost:11434/v1` (and `OPENAI_API_KEY=ollama`) to route requests through a local Ollama instance instead
+- Summaries are cached in-process, keyed by SHA-256 hash of the cluster centroid, so repeated calls for the same cluster avoid redundant API round-trips
+- `app/models.py` now exports `ClusterSummary` (Pydantic v2 model added in M4)
+- All tests pass: `pytest tests/ -v -m "not slow"` (OpenAI calls are mocked in `test_summarizer.py`)
 
+M3 (embedding + clustering): MiniLM embedder, HDBSCAN clusterer, recency-weighted risk scorer.
 M2 (data layer): synthetic dataset generator, CSV/JSONL ingest, Pydantic model.
 M1 (scaffold): Python package layout, FastAPI skeleton, `GET /healthz`, pinned deps.
 
-Risk scorer integration, LLM summarizer, and dashboard ship in M4–M5.
+Dashboard ships in M5.
 
-## Planned Architecture
+## Architecture
 
 ```
 ┌─────────────┐     ┌───────────────┐     ┌─────────────┐
@@ -83,10 +85,11 @@ incidentlens/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py          # FastAPI app entry point
-│   ├── models.py        # Incident Pydantic v2 model  (M2)
+│   ├── models.py        # Incident, ClusterSummary Pydantic v2 models (M2, M4)
 │   ├── ingestion.py     # load_incidents(CSV/JSONL)   (M2)
 │   ├── embedder.py      # embed(incidents) → ndarray  (M3)
-│   └── clusterer.py     # cluster() → ClusterResult[] (M3)
+│   ├── clusterer.py     # cluster() → ClusterResult[] (M3)
+│   └── summarizer.py    # summarize_cluster() → ClusterSummary (M4)
 ├── demo/
 │   ├── __init__.py
 │   ├── .gitkeep
@@ -95,7 +98,8 @@ incidentlens/
 │   ├── __init__.py
 │   ├── test_smoke.py         # healthz smoke test
 │   ├── test_ingestion.py     # generator + ingestion tests (M2)
-│   └── test_clustering.py    # embedder + clusterer tests  (M3)
+│   ├── test_clustering.py    # embedder + clusterer tests  (M3)
+│   └── test_summarizer.py    # summarizer tests, OpenAI mocked (M4)
 ├── requirements.txt     # pinned runtime + dev deps
 ├── Makefile             # install / run / demo / test
 ├── LICENSE              # MIT
@@ -120,7 +124,7 @@ incidentlens/
 | M1 | Scaffold: package layout, FastAPI skeleton, Makefile, pinned deps | done |
 | M2 | Data layer: synthetic dataset generator, CSV/JSONL ingest, Pydantic model | done |
 | M3 | Embedding + clustering: MiniLM embedder, HDBSCAN clusterer, risk scoring | done |
-| M4 | LLM summarizer: OpenAI/Ollama cluster summarizer, `POST /ingest` + `GET /clusters` endpoints | <!-- TODO --> |
+| M4 | LLM summarizer: OpenAI/Ollama cluster summarizer, centroid-keyed cache, `ClusterSummary` model | done |
 | M5 | Dashboard: Jinja2 risk-ranked cluster cards, `GET /clusters` endpoint | <!-- TODO --> |
 
 ## License

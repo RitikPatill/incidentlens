@@ -1,5 +1,9 @@
 # IncidentLens — LLM-Powered Risk Discovery from Noisy Incident Streams
 
+
+> **Video walkthrough:** https://youtu.be/pBfTJQsJ6d0
+> **60-second overview:** https://youtu.be/W9lW74xI4NQ
+
 > Cluster noisy support tickets or system alerts, surface emerging risk patterns, and get LLM-written summaries — all locally.
 
 <!-- TODO: replace with a 5-10 second demo gif. Record with ScreenToGif on
